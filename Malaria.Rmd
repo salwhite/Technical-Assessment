@@ -1,0 +1,89 @@
+---
+title: "malaria"
+author: "yh"
+date: "2/18/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(malariaAtlas)
+library (ggplot2)
+library(dplyr)
+library(maps)
+library(stringr)
+library(tidyr)
+
+## Malaria incidence by country for all ages across the world across time
+
+malaria_incidence<-read.csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2018/2018-11-13/malaria_inc.csv")
+
+malaria_incidence_processed <- malaria_incidence %>%
+setNames(c("country", "code", "year", "incidence")) %>%
+mutate(incidence = incidence / 1000)
+
+malaria_spread <- malaria_incidence_processed %>%
+ mutate(year = paste0("Y", year)) %>%
+spread(year, incidence)
+
+malaria_spread %>%
+ filter(country != "Turkey",
+ !is.na(code)) %>%
+ mutate(current = Y2015,
+ change = Y2015 - Y2000) %>%
+ ggplot(aes(current, change)) +
+ geom_point() +
+ geom_text(aes(label = code), vjust = 1, hjust = 1)
+ 
+ 
+ world <- map_data("world") %>%
+filter(region != "Antarctica")
+ malaria_incidence_processed %>%
+ filter(incidence < 1) %>%
+ inner_join(maps::iso3166 %>%
+select(a3, mapname), by = c(code = "a3"))%>%
+ inner_join(world, by = c(mapname = "region")) %>%
+ ggplot(aes(long, lat, group = group, fill = incidence)) +
+geom_polygon() +
+ scale_fill_gradient2(low = "green", high = "red", midpoint = .20, labels = scales::percent_format()) +
+ facet_wrap(~ year) 
+ 
+ 
+malaria_deaths_all_ages<-read.csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2018/2018-11-13/malaria_deaths.csv")
+
+## Malaria deaths by country for all ages across the world and time.
+
+malaria_deaths_processed <- malaria_deaths_all_ages %>%
+setNames(c("country", "code", "year", "deaths"))
+malaria_deaths_processed %>%
+filter(country %in% sample(unique(country), 6)) %>%
+ggplot(aes(year, deaths, color = country)) +
+geom_line() +
+labs(y = "Deaths per 100,000")
+
+
+
+malaria_country_data <- malaria_deaths_processed %>%
+ inner_join(maps::iso3166 %>%
+ select(a3, mapname), by = c(code = "a3")) %>%
+ mutate(mapname = str_remove(mapname, "\\(.*"))
+malaria_map_data <- map_data("world") %>%
+ filter(region != "Antarctica") %>%
+ tbl_df() %>%
+ inner_join(malaria_country_data, by = c(region = "mapname"))
+ malaria_map_data %>%
+ ggplot(aes(long, lat, group = group, fill = deaths)) +
+ geom_polygon() +
+ scale_fill_gradient2(low = "green", high = "red", midpoint = 100)+
+ theme_void() +
+ labs(title = "Malaria deaths by country for all ages across the world and time",fill = "Deaths per 100,000") 
+```
